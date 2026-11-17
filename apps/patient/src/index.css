@@ -1,0 +1,12 @@
+@import 'tailwindcss';
+@import '@fontsource/atkinson-hyperlegible/400.css';
+@import '@fontsource/atkinson-hyperlegible/700.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@lindauria/design-system/styles.css';
+
+/* o Tailwind precisa enxergar as classes usadas dentro dos pacotes */
+@source '../../../packages/design-system/src';

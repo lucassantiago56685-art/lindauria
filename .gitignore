@@ -1,0 +1,8 @@
+node_modules
+dist
+.turbo
+*.local
+.env
+# Assets baixados/copiados pelo script de setup (modelo e wasm do MediaPipe)
+apps/patient/public/models/
+apps/patient/public/mediapipe/
