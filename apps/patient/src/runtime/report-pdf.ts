@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { FEELINGS, MOODS, REMINDER_KINDS, moodLabel, type Report } from './care-logic';
+import { FEELINGS, MOODS, REMINDER_KINDS, moodLabel, type Report, painAreaLabel } from './care-logic';
 
 /* =============================================================================================
    Relatório em PDF (dia, semana ou mês): como a pessoa se sentiu, dor, frases mais faladas,
@@ -156,6 +156,10 @@ export function reportPdf(r: Report, patientName: string): Blob {
     y += 4; // respiro depois do gráfico
   }
   if (r.painMax !== null) text(`Dor: média ${r.painAvg!.toFixed(1).replace('.', ',')} e máxima ${r.painMax} (escala 0 a 10).`, M, 10, 'bold', C.bad);
+  if (r.painAreas.length) {
+    section('Mapa de dor (onde doeu)');
+    for (const a of r.painAreas) text(`${a.label}: ${a.count} registro(s), dor máxima ${a.max}/10`, M + 2, 10, a.max >= 7 ? 'bold' : 'normal', a.max >= 7 ? C.bad : C.ink);
+  }
 
   // ---- frases ----
   section('O que mais falou');
@@ -190,9 +194,10 @@ export function reportPdf(r: Report, patientName: string): Blob {
   section('Registros detalhados');
   if (!r.entries.length) text('Sem registros.', M, 10, 'normal', C.soft);
   for (const e of r.entries) {
-    const m = MOODS.find((x) => x.value === e.mood)?.label ?? '';
+    const m = MOODS.find((x) => x.value === e.mood)?.label ?? 'Mapa de dor';
+    const areas = (e.painAreas ?? []).map((a) => `${painAreaLabel(a.area)} ${a.level}/10${a.types.length ? ` (${a.types.join(', ')})` : ''}`).join('; ');
     const fs = e.feelings.map((id) => FEELINGS.find((f) => f.id === id)?.label ?? id).join(', ');
-    text(`${fmtDateTime(e.at)} - ${m}${fs ? ` - sentiu: ${fs}` : ''}${e.pain !== null ? ` - dor ${e.pain}/10` : ''}${e.note ? ` - "${e.note}"` : ''}`, M + 2, 9.5);
+    text(`${fmtDateTime(e.at)} - ${m}${fs ? ` - sentiu: ${fs}` : ''}${e.pain !== null ? ` - dor ${e.pain}/10` : ''}${areas ? ` - onde: ${areas}` : ''}${e.note ? ` - "${e.note}"` : ''}`, M + 2, 9.5);
   }
 
   // ---- rodapé em todas as páginas ----

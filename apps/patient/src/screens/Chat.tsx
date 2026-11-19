@@ -8,6 +8,7 @@ import { useApp } from '../store/app';
 import { emergency, say, sounds } from '../runtime/engine';
 import { AiFailure, askChat, type ChatTurn } from '../runtime/ai';
 import { ScreenShell } from '../components/common';
+import { AiConsentCard, useAiConsent } from '../components/AiConsent';
 import { ScrollArea, TextField } from '../components/ScrollArea';
 
 const KEY = 'chat-history';
@@ -40,6 +41,31 @@ export function UrgencyBanner({ check }: { check: UrgencyCheck }) {
   );
 }
 
+const RIGHTS = /(bpc|loas|inss|benef[ií]cio|isen[çc][ãa]o|ipva|ipi|icms|imposto|aposentadoria|fgts|passe livre|direito|cras|aux[ií]lio|defensoria)/i;
+const HEALTH = /(rem[ée]dio|medica|dose|riluzol|sintoma|tratamento|exame|doen[çc]a|ela|fisioterapia|fono|nutri|respira|engol|sonda|gastrostomia|ventila)/i;
+
+/** Fonte e data da informação + onde confirmar (regras de benefícios mudam). */
+function SourceNote({ text, at }: { text: string; at?: number }) {
+  const when = at ? new Date(at).toLocaleDateString('pt-BR') : null;
+  const rights = RIGHTS.test(text);
+  const health = HEALTH.test(text);
+  return (
+    <span className="mt-2 block border-t pt-2 text-[0.75em]" style={{ borderColor: 'var(--border-glow)', color: 'var(--text-secondary)' }}>
+      📌 Fonte: IA Claude (Anthropic), conhecimento até meados de 2026{when ? ` · resposta de ${when}` : ''}.
+      {rights && (
+        <strong className="block" style={{ color: 'var(--warning-text)' }}>
+          ⚖️ Regras e valores do BPC, isenções e benefícios mudam. Confirme no CRAS, no INSS (135 / app Meu INSS) ou na Defensoria Pública.
+        </strong>
+      )}
+      {health && (
+        <strong className="block" style={{ color: 'var(--warning-text)' }}>
+          🩺 Confirme com o médico ou a equipe de saúde antes de mudar qualquer cuidado.
+        </strong>
+      )}
+    </span>
+  );
+}
+
 export function Chat() {
   const text = useApp((s) => s.text);
   const setText = useApp((s) => s.setText);
@@ -50,6 +76,7 @@ export function Chat() {
   const [urgency, setUrgency] = useState<UrgencyCheck>({ urgent: false, emotional: false });
   const [typed, setTyped] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
+  const [consent, giveConsent] = useAiConsent('ai-chat-consent');
 
   useEffect(() => {
     void secureGet<ChatTurn[]>(KEY).then((h) => h && setHistory(h));
@@ -71,7 +98,7 @@ export function Chat() {
     setBusy(true);
     try {
       const answer = await askChat(next);
-      const done: ChatTurn[] = [...next, { role: 'assistant', content: answer }];
+      const done: ChatTurn[] = [...next, { role: 'assistant', content: answer, at: Date.now() }];
       setHistory(done);
       void secureSet(KEY, done.slice(-60));
       sounds.sent();
@@ -85,6 +112,14 @@ export function Chat() {
   }
 
   const lastAnswer = [...history].reverse().find((m) => m.role === 'assistant');
+
+  if (consent === false) {
+    return (
+      <ScreenShell icon="🤖" title="Chat LindaurIA">
+        <AiConsentCard what="chat" onAccept={giveConsent} />
+      </ScreenShell>
+    );
+  }
 
   return (
     <ScreenShell icon="🤖" title="Chat LindaurIA" subtitle="tire dúvidas com a IA">
@@ -125,6 +160,7 @@ export function Chat() {
                 {m.role === 'assistant' ? '🤖 LindaurIA' : '🙂 Você'}
               </span>
               {m.content}
+              {m.role === 'assistant' && <SourceNote text={m.content + ' ' + (history[i - 1]?.content ?? '')} at={m.at} />}
             </div>
           </motion.div>
         ))}

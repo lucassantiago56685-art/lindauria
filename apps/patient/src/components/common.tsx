@@ -7,6 +7,7 @@ import { useApp } from '../store/app';
 import { useSettings } from '../store/settings';
 import { emergency, getHead } from '../runtime/engine';
 import { canReceiveAlerts, useFamily } from '../runtime/family';
+import { useOutbox } from '../runtime/outbox';
 
 /** Na tela de emergência: quem da família já foi avisado. */
 function FamilyDeliveryStatus() {
@@ -15,6 +16,7 @@ function FamilyDeliveryStatus() {
   const list = all.filter(canReceiveAlerts);
   const delivery = useFamily((s) => s.delivery);
   const photos = useSettings((s) => s.settings.emergencyPhotos);
+  const online = useOutbox((s) => s.online);
   if (!list.length) {
     return (
       <p className="mt-2 text-[0.95em] font-semibold" style={{ color: 'var(--warning-text)' }}>
@@ -25,6 +27,11 @@ function FamilyDeliveryStatus() {
   const anyOnTheWay = list.some((m) => delivery[m.id]?.onTheWay);
   return (
     <div className="mt-2 flex flex-wrap justify-center gap-2 text-[0.9em] font-semibold" role="status" aria-live="polite">
+      {!online && (
+        <span className="w-full rounded-xl px-3 py-2 text-center text-[1.05em]" style={{ background: 'var(--danger)', color: '#fff' }}>
+          📵 SEM INTERNET — o alarme está tocando só AQUI. Chame alguém por perto! A família será avisada assim que a conexão voltar.
+        </span>
+      )}
       {!anyOnTheWay && resends > 0 && (
         <span className="w-full text-center" style={{ color: 'var(--warning-text)' }}>
           🔁 Ninguém respondeu ainda — alarme reenviado {resends}x (a cada 1 minuto)
@@ -35,8 +42,13 @@ function FamilyDeliveryStatus() {
         const label = d?.onTheWay
           ? '🏃 está a caminho!'
           : d?.text === 'sent'
-            ? '✔ avisado(a)' : d?.text === 'failed' ? '⚠ sem internet, tentando de novo' : '⏳ avisando…';
-        const color = d?.text === 'sent' ? 'var(--success-text)' : d?.text === 'failed' ? 'var(--danger-text)' : 'var(--warning-text)';
+            ? '✔ avisado(a)'
+            : d?.text === 'queued'
+              ? '📵 ainda NÃO avisado(a): sai quando a internet voltar'
+              : d?.text === 'failed'
+                ? '⚠ falhou, tentando de novo'
+                : '⏳ avisando…';
+        const color = d?.text === 'sent' ? 'var(--success-text)' : d?.text === 'failed' || d?.text === 'queued' ? 'var(--danger-text)' : 'var(--warning-text)';
         return (
           <span key={m.id} className="la-glass px-3 py-1" style={{ color }}>
             📲 {m.name}: {label}
@@ -206,6 +218,7 @@ function Overlay({ children, label, tone = 'deep' }: { children: ReactNode; labe
 /** Descanso: nada é clicado sem querer (ver TV, conversar). Gesto de emergência continua ativo. */
 export function RestOverlay() {
   const emergencyGesture = useSettings((s) => s.settings.emergencyGesture);
+  const count = useSettings((s) => s.settings.emergencyCount);
   return (
     <Overlay label="Modo descanso">
       <div className="flex w-full max-w-3xl flex-col items-center gap-6 text-center">
@@ -215,7 +228,11 @@ export function RestOverlay() {
         <h2 className="text-[1.8em] font-bold">Modo descanso</h2>
         <p className="text-[1.05em]" style={{ color: 'var(--text-secondary)' }}>
           O app não vai clicar em nada. Para voltar, mire no botão abaixo por 3 segundos.
-          {emergencyGesture !== 'off' && ' O gesto de emergência continua funcionando.'}
+          {emergencyGesture !== 'off' && (
+            <strong style={{ color: 'var(--danger-text)' }}>
+              {' '}A emergência continua ligada: {count} {emergencyGesture === 'longBlink3' ? 'piscadas longas' : 'vezes as sobrancelhas'} ou o botão vermelho.
+            </strong>
+          )}
         </p>
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
           <GlowButton
@@ -342,13 +359,35 @@ export function ConfirmDialog({
 export function EmergencyHitsToast() {
   const hits = useApp((s) => s.emergencyHits);
   const g = useSettings((s) => s.settings.emergencyGesture);
+  const total = useSettings((s) => s.settings.emergencyCount);
   if (!hits || g === 'off') return null;
   const name = g === 'longBlink3' ? 'Piscada longa' : 'Sobrancelhas';
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[900] flex justify-center px-4" role="status" aria-live="assertive">
       <GlassCard className="px-5 py-3 text-[1em] font-bold" style={{ borderColor: 'var(--warning)', color: 'var(--warning-text)' }}>
-        {name} {hits} de 3 — mais {3 - hits} para chamar ajuda
+        {name} {hits} de {total} — mais {total - hits} para chamar ajuda
       </GlassCard>
+    </div>
+  );
+}
+
+/**
+ * Aviso FIXO e bem visível quando a internet cai: a emergência continua tocando no aparelho,
+ * mas a família só é avisada quando a conexão voltar.
+ */
+export function OfflineBanner() {
+  const online = useOutbox((s) => s.online);
+  const queued = useOutbox((s) => s.items.length);
+  const hasFamily = useFamily((s) => s.list.some(canReceiveAlerts));
+  const inEmergency = useApp((s) => !!s.emergency); // a tela de emergência já mostra o aviso dela
+  if ((online && !queued) || inEmergency) return null;
+  return (
+    <div role="alert" className="pointer-events-none fixed inset-x-0 top-0 z-[1200] flex justify-center p-2">
+      <div className="max-w-3xl rounded-2xl px-4 py-2 text-center text-[0.85em] font-bold shadow-lg" style={{ background: online ? 'var(--warning)' : 'var(--danger)', color: online ? '#060A17' : '#fff' }}>
+        {!online
+          ? `📵 Sem internet. A emergência toca o alarme AQUI, mas ${hasFamily ? 'a família NÃO recebe o aviso agora' : 'ninguém é avisado no celular'}${queued ? ` (${queued} aviso(s) na fila, saem quando a conexão voltar)` : ''}.`
+          : `⏳ Enviando ${queued} aviso(s) que ficaram na fila…`}
+      </div>
     </div>
   );
 }

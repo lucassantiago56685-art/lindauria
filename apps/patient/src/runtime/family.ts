@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { secureGet, secureSet } from '@lindauria/shared';
 import { EMERGENCY_PHRASES, NtfyNotifier, newAlertTopic, type AlertMessage, type EmergencyEvent } from '@lindauria/safety';
 import { getSettings, useSettings } from '../store/settings';
+import { enqueue, setOutboxDeliveredHandler } from './outbox';
 import { useApp } from '../store/app';
 
 /**
@@ -27,7 +28,7 @@ export interface FamilyMember {
   createdAt: number;
 }
 
-export type Delivery = { text: 'sending' | 'sent' | 'failed'; photos: number; onTheWay?: boolean };
+export type Delivery = { text: 'sending' | 'sent' | 'failed' | 'queued'; photos: number; onTheWay?: boolean };
 
 interface FamilyState {
   list: FamilyMember[];
@@ -111,9 +112,13 @@ function setDelivery(id: string, patch: Partial<Delivery>) {
   }));
 }
 
-/** envia e, se falhar (sem internet), tenta de novo a cada 8 s enquanto a emergência durar */
+/**
+ * Envia; se falhar (sem internet), tenta mais 2 vezes e então coloca na FILA de envio:
+ * o aviso sai sozinho quando a conexão voltar (mesmo que o app seja reaberto).
+ */
 async function sendWithRetry(e: EmergencyEvent, m: FamilyMember, msg: AlertMessage) {
-  for (let attempt = 0; attempt < 8; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
     try {
       setDelivery(m.id, { text: 'sending' });
       await notifier().sendText(m.topic, msg);
@@ -121,12 +126,20 @@ async function sendWithRetry(e: EmergencyEvent, m: FamilyMember, msg: AlertMessa
       return true;
     } catch {
       setDelivery(m.id, { text: 'failed' });
-      if (!stillActive(e)) return false;
-      await sleep(8000);
+      await sleep(3000);
     }
   }
+  setDelivery(m.id, { text: 'queued' });
+  enqueue({ id: `${e.id}-${m.id}`, topic: m.topic, msg, memberId: m.id, kind: 'emergency' });
   return false;
 }
+
+// quando a fila consegue enviar, a tela de emergência mostra "avisado(a)"
+setOutboxDeliveredHandler((item) => {
+  if (item.kind === 'emergency' && item.memberId && useFamily.getState().delivery[item.memberId]) {
+    setDelivery(item.memberId, { text: 'sent' });
+  }
+});
 
 // ---- fotos ----
 let captureSource: () => HTMLVideoElement | null = () => null;
@@ -268,8 +281,9 @@ async function escalate(e: EmergencyEvent, first: AlertMessage) {
       title: `🆘 AINDA SEM RESPOSTA (${n}) — ${patientDisplayName()}`,
       tags: ['rotating_light', 'repeat'],
     };
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) continue; // a fila já guarda o 1º aviso
     for (const m of useFamily.getState().list.filter(canReceiveAlerts)) {
-      void notifier().sendText(m.topic, msg).catch(() => setDelivery(m.id, { text: 'failed' }));
+      void notifier().sendText(m.topic, msg).catch(() => undefined);
     }
   }
 }

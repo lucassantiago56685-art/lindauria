@@ -100,7 +100,10 @@ export function aiApi(env: Record<string, string | undefined>): Plugin {
           .slice(-20) // contexto das últimas 20 falas
           .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
         if (!messages.length || messages[messages.length - 1].role !== 'user') return send(res, 400, { error: 'pergunta' });
-        const text = await ask(CHAT_SYSTEM_PROMPT, messages);
+        const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+        const text = await ask(`${CHAT_SYSTEM_PROMPT}
+
+Data de hoje: ${today}.`, messages);
         return send(res, 200, { text, promptVersion: PROMPT_VERSION });
       }
 

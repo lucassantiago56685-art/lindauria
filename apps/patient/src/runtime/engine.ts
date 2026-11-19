@@ -16,6 +16,7 @@ import { notifyCancelled, notifyFamily, notifyKindChange, setCaptureSource, setR
 import { setReminderRingHandler, startReminderScheduler, useCare } from './care';
 import {
   DEFAULT_SETTINGS,
+  getAudioContext,
   LocalAuthProvider,
   requestPersistentStorage,
   secureGet,
@@ -27,6 +28,59 @@ import {
 } from '@lindauria/shared';
 import { Speaker } from '@lindauria/voice';
 import { useApp } from '../store/app';
+import { startOutbox } from './outbox';
+import { playFromBank } from './voicebank';
+import { Scanner, SoundSwitch } from './scanner';
+
+// ---------------------------------------------------------------- varredura (um acionador)
+export const scanner = new Scanner();
+scanner.onStep = () => sounds.focus();
+scanner.onSelect = () => sounds.click();
+const soundSwitch = new SoundSwitch();
+soundSwitch.onTrigger = () => scanner.select();
+let soundOn = false;
+
+function applyScan(s: Settings) {
+  if (s.scanEnabled) {
+    if (!scanner.running || scanner.stepMs !== s.scanMs) scanner.start(s.scanMs);
+  } else scanner.stop();
+  const wantSound = s.scanEnabled && s.scanSound;
+  if (wantSound && !soundOn) {
+    soundOn = true;
+    void soundSwitch.start().catch(() => (soundOn = false));
+  } else if (!wantSound && soundOn) {
+    soundOn = false;
+    soundSwitch.stop();
+  }
+}
+
+// acionador por TECLA: espaço/Enter (acionadores USB/Bluetooth costumam "apertar" essas teclas)
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (!getSettings().scanEnabled || (e.key !== ' ' && e.key !== 'Enter')) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      scanner.select();
+    },
+    true,
+  );
+  // o botão em foco também "clicaria" ao soltar o espaço: bloqueia para não escolher duas vezes
+  window.addEventListener(
+    'keyup',
+    (e) => {
+      if (!getSettings().scanEnabled || (e.key !== ' ' && e.key !== 'Enter')) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true,
+  );
+}
 import { getSettings, useSettings } from '../store/settings';
 
 /* ============================================================================================
@@ -142,6 +196,7 @@ function onGesture(g: GestureName, t: number) {
   }
 
   // seleção por gesto (desligada durante o descanso)
+  if (g === s.selectGesture && s.scanEnabled) return scanner.select();
   if (g === s.selectGesture && !useApp.getState().resting) dwell.selectCurrent();
 }
 
@@ -164,7 +219,8 @@ export async function startInput(mode: InputMode): Promise<TrackerError | null> 
     active = new PointerInputProvider();
   }
   const p = active;
-  unsubs.push(p.onPointer((s) => dwell.feed(s)));
+  // com a varredura ligada, a seta não clica sozinha (quem escolhe é o acionador)
+  unsubs.push(p.onPointer((s) => !getSettings().scanEnabled && dwell.feed(s)));
   unsubs.push(p.onGesture(onGesture));
   unsubs.push(
     p.onStatus((st) => useApp.setState((a) => ({ tracking: { ...a.tracking, detected: st.detected, fps: st.fps } }))),
@@ -206,13 +262,15 @@ export async function speakText(raw: string) {
   void addHistory(text);
   sounds.sent();
   const s = getSettings();
+  if (s.useMyVoice && (await playFromBank(text))) return; // a própria voz da pessoa (banco de voz)
   await speaker.speak(text, { rate: s.speechRate, pitch: s.speechPitch });
 }
 
 /** Fala uma resposta pronta (Sim, Não...) sem aprender vocabulário. */
-export function say(text: string) {
+export async function say(text: string) {
   const s = getSettings();
   sounds.sent();
+  if (s.useMyVoice && (await playFromBank(text))) return;
   return speaker.speak(text, { rate: s.speechRate, pitch: s.speechPitch });
 }
 
@@ -243,6 +301,10 @@ function applySettings(s: Settings) {
   head?.configure(headConfig(s));
   speaker.setPreferred(s.voiceURI);
   setAutoCorrect(s.autoCorrect !== false);
+  applyScan(s);
+  document.documentElement.toggleAttribute('data-big-targets', !!s.bigTargets);
+  emergencySeq.count = s.emergencyCount;
+  emergencySeq.windowMs = s.emergencyWindowMs;
   sounds.volumes = s.sounds;
   emergency.remoteDelayMs = s.alertImmediate ? 0 : CANCEL_WINDOW_MS;
 }
@@ -268,6 +330,7 @@ export async function initRuntime() {
     setTimeout(() => void speaker.speak(`Lembrete: ${d.reminder.title}.`, { interrupt: false }), 2200);
   });
   startReminderScheduler();
+  void startOutbox(); // avisos que ficaram sem enviar (sem internet) saem agora
   // sessão salva: quem já entrou (ou escolheu usar sem conta) vai direto para "Começar"
   const { session, account } = await auth.restore();
   const invite = new URLSearchParams(location.search).has('familia');
@@ -287,4 +350,35 @@ export async function signOut() {
   await auth.signOut();
   stopInput();
   useApp.setState({ session: null, account: null, screen: 'landing', text: '' });
+}
+
+// ---------------------------------------------------------------- campainha "chamar cuidador"
+/**
+ * Campainha LOCAL (ding-dong 3x + voz): para pedir ajuda em algo simples sem disparar a emergência
+ * e sem mandar alerta para a família.
+ */
+export function callCaregiver() {
+  const ctx = getAudioContext();
+  if (ctx) {
+    const vol = Math.max(0.4, getSettings().sounds.alarm * 0.8);
+    const tone = (freq: number, at: number) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(vol, at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 1.1);
+      o.connect(g).connect(ctx.destination);
+      o.start(at);
+      o.stop(at + 1.2);
+    };
+    for (let i = 0; i < 3; i++) {
+      const t0 = ctx.currentTime + i * 1.6;
+      tone(880, t0);
+      tone(660, t0 + 0.5);
+    }
+  }
+  vibrate([200, 100, 200]);
+  setTimeout(() => void speaker.speak('Pode vir aqui, por favor?', { interrupt: false }), 4900);
 }

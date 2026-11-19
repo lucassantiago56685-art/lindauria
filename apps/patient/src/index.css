@@ -10,3 +10,22 @@
 
 /* o Tailwind precisa enxergar as classes usadas dentro dos pacotes */
 @source '../../../packages/design-system/src';
+
+/* VARREDURA: linha/botão aceso (bem visível também em alto contraste) */
+[data-scan] {
+  outline: 5px solid var(--accent) !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 9px color-mix(in srgb, var(--accent) 35%, transparent) !important;
+  position: relative;
+  z-index: 5;
+}
+[data-scan='item'] {
+  outline-width: 7px !important;
+  transform: scale(1.04);
+}
+
+/* BOTÕES MAIORES (baixa visão): aumenta a altura mínima e o espaçamento dos alvos */
+:root[data-big-targets] .la-btn {
+  min-height: max(4.2em, 64px);
+  font-size: 1.08em;
+}

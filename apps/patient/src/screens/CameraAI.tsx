@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { GlassCard, GlowButton } from '@lindauria/design-system';
 import { CAMERA_QUESTIONS, detectUrgency, type UrgencyCheck } from '@lindauria/ai';
 import { finalizeText } from '@lindauria/keyboards';
-import { secureGet, secureSet } from '@lindauria/shared';
 import { useApp } from '../store/app';
 import { getHead, say, sounds } from '../runtime/engine';
 import { AiFailure, askVision, shrinkPhoto } from '../runtime/ai';
 import { ScreenShell } from '../components/common';
+import { AiConsentCard, useAiConsent } from '../components/AiConsent';
 import { ScrollArea } from '../components/ScrollArea';
 import { UrgencyBanner } from './Chat';
 
@@ -28,12 +28,9 @@ export function CameraAI() {
   const [answer, setAnswer] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [consent, setConsent] = useState<boolean | null>(null);
+  const [consent, giveConsent] = useAiConsent('ai-photo-consent');
   const [urgency, setUrgency] = useState<UrgencyCheck>({ urgent: false, emotional: false });
 
-  useEffect(() => {
-    void secureGet<boolean>('ai-photo-consent').then((v) => setConsent(!!v));
-  }, []);
 
   // câmera: a frontal é a mesma do rastreamento (não desliga a seta); a traseira abre à parte
   useEffect(() => {
@@ -120,30 +117,11 @@ export function CameraAI() {
     setUrgency({ urgent: false, emotional: false });
   };
 
-  // aviso de privacidade na primeira vez
+  // autorização explícita na primeira vez (LGPD)
   if (consent === false) {
     return (
       <ScreenShell icon="📷" title="Câmera Inteligente">
-        <div className="flex flex-1 items-center justify-center">
-          <GlassCard className="flex max-w-2xl flex-col gap-4 p-6 text-center">
-            <h2 className="text-[1.4em] font-bold">🔒 Antes de começar</h2>
-            <p>
-              Quando você escolher uma pergunta, a <strong>foto é enviada para a inteligência artificial</strong> (Claude, da
-              Anthropic) para ser analisada. Ela não fica salva no nosso servidor.
-            </p>
-            <p className="text-[0.9em]" style={{ color: 'var(--text-secondary)' }}>
-              A câmera da seta continua só no aparelho. A IA não identifica pessoas pelo rosto. O cuidador pode desligar a
-              Câmera IA.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <GlowButton tone="success" icon="👍" label="Entendi, continuar" className="min-h-[3.6em]" onClick={() => {
-                setConsent(true);
-                void secureSet('ai-photo-consent', true);
-              }} />
-              <GlowButton tone="neutral" icon="🏠" label="Voltar" className="min-h-[3.6em]" onClick={() => go('hub')} />
-            </div>
-          </GlassCard>
-        </div>
+        <AiConsentCard what="photo" onAccept={giveConsent} />
       </ScreenShell>
     );
   }

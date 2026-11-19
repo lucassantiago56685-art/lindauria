@@ -3,7 +3,7 @@ import { AuroraBackground, OrbCursor } from '@lindauria/design-system';
 import { useApp } from './store/app';
 import { useSettings } from './store/settings';
 import { subscribeCursor } from './runtime/engine';
-import { EmergencyHitsToast, EmergencyOverlay, RestOverlay } from './components/common';
+import { EmergencyHitsToast, EmergencyOverlay, OfflineBanner, RestOverlay } from './components/common';
 import { Splash } from './screens/Splash';
 import { Calibration } from './screens/Calibration';
 import { Hub } from './screens/Hub';
@@ -23,6 +23,10 @@ import { Draw } from './screens/Draw';
 import { Feelings } from './screens/Feelings';
 import { Reminders } from './screens/Reminders';
 import { Reports } from './screens/Reports';
+import { Privacy } from './screens/Privacy';
+import { PainMap } from './screens/PainMap';
+import { VoiceBank } from './screens/VoiceBank';
+import { Conversation } from './screens/Conversation';
 import { KeyboardShortcuts, ReminderOverlay } from './components/extra';
 
 const Login = () => <AuthScreen mode="login" />;
@@ -48,6 +52,10 @@ const SCREENS = {
   speak: Speak,
   yesno: YesNo,
   settings: Settings,
+  privacy: Privacy,
+  painmap: PainMap,
+  voicebank: VoiceBank,
+  conversation: Conversation,
   soon: ComingSoon,
 } as const;
 
@@ -81,6 +89,7 @@ export function App() {
       {resting && !emergency && <RestOverlay />}
       {emergency && <EmergencyOverlay />}
       <EmergencyHitsToast />
+      <OfflineBanner />
       {cursorStyle !== 'none' && <OrbCursor subscribe={subscribeCursor} variant={cursorStyle} />}
       <ReminderOverlay />
       <KeyboardShortcuts />

@@ -11,6 +11,7 @@ import {
   type Reminder,
   type ReminderLog, reminderTargets } from './care-logic';
 import { canReceiveAlerts, patientDisplayName, useFamily } from './family';
+import { enqueue } from './outbox';
 
 /* =============================================================================================
    Cuidados do dia a dia: "Como estou" (o que a pessoa sente), lembretes e seus registros.
@@ -89,7 +90,11 @@ const kindOf = (k: Reminder['kind']) => REMINDER_KINDS.find((x) => x.id === k)!;
 function notifyFamily(r: Reminder, title: string, message: string, tags: string[], priority: 2 | 3 | 4) {
   const members = reminderTargets(r, useFamily.getState().list.filter(canReceiveAlerts));
   const n = new NtfyNotifier(getSettings().alertServer);
-  for (const m of members) void n.sendText(m.topic, { title, message, priority, tags }).catch(() => undefined);
+  for (const m of members) {
+    const msg = { title, message, priority, tags };
+    // sem internet: guarda na fila e envia quando a conexão voltar
+    void n.sendText(m.topic, msg).catch(() => enqueue({ topic: m.topic, msg, memberId: m.id, kind: 'reminder' }));
+  }
 }
 
 // ---- ganchos do engine (voz e som) sem import circular ----

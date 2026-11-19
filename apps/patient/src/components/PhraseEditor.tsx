@@ -11,7 +11,7 @@ const MAX_REC_MS = 15_000;
 type RecState = 'idle' | 'recording' | 'done' | 'error';
 
 /** Grava um som curto pelo microfone (fica só neste aparelho). */
-function useRecorder(initial: string | null) {
+export function useRecorder(initial: string | null) {
   const [audio, setAudio] = useState<string | null>(initial);
   const [state, setState] = useState<RecState>(initial ? 'done' : 'idle');
   const [elapsed, setElapsed] = useState(0);

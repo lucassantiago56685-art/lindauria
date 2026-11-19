@@ -120,3 +120,26 @@ export async function secureWipeAll(): Promise<void> {
   await getDb()?.delete().catch(() => undefined);
   db = null;
 }
+
+/** LGPD (portabilidade) e cópia de segurança: lê TODOS os dados guardados, já decifrados. */
+export async function secureExportAll(): Promise<Record<string, unknown>> {
+  const database = getDb();
+  if (!database) return Object.fromEntries(memory);
+  const out: Record<string, unknown> = {};
+  const keys = (await database.kv.toCollection().primaryKeys()) as string[];
+  for (const k of keys) {
+    const v = await secureGet<unknown>(k);
+    if (v !== null) out[k] = v;
+  }
+  return out;
+}
+
+/** Restaura uma cópia (substitui as chaves presentes na cópia; o resto fica como está). */
+export async function secureImportAll(data: Record<string, unknown>): Promise<number> {
+  let n = 0;
+  for (const [k, v] of Object.entries(data)) {
+    await secureSet(k, v);
+    n++;
+  }
+  return n;
+}

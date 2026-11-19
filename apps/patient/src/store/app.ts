@@ -23,6 +23,10 @@ export type Screen =
   | 'reminders'
   | 'reports'
   | 'settings'
+  | 'privacy'
+  | 'painmap'
+  | 'voicebank'
+  | 'conversation'
   | 'soon';
 
 /** Funções das próximas fases: aparecem no Hub, mas explicam honestamente quando chegam. */

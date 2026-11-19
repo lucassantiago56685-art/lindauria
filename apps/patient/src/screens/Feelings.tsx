@@ -4,7 +4,7 @@ import { finalizeText } from '@lindauria/keyboards';
 import { useApp } from '../store/app';
 import { say } from '../runtime/engine';
 import { useCare } from '../runtime/care';
-import { FEELINGS, MOODS } from '../runtime/care-logic';
+import { FEELINGS, MOODS, painAreaLabel } from '../runtime/care-logic';
 import { ScreenShell } from '../components/common';
 import { ScrollArea } from '../components/ScrollArea';
 
@@ -112,7 +112,7 @@ export function Feelings() {
             </p>
           )}
           {today.map((e) => {
-            const m = MOODS.find((x) => x.value === e.mood)!;
+            const m = MOODS.find((x) => x.value === e.mood) ?? { icon: '🗺️', label: 'Mapa de dor' };
             return (
               <GlassCard key={e.id} className="flex flex-wrap items-center gap-2 p-3 text-[0.9em]">
                 <span className="font-bold">{new Date(e.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -124,6 +124,11 @@ export function Feelings() {
                   return f ? <span key={id} className="la-glass px-2 py-0.5 text-[0.85em]">{f.icon} {f.label}</span> : null;
                 })}
                 {e.pain !== null && <span style={{ color: 'var(--danger-text)' }}>dor {e.pain}/10</span>}
+                {e.painAreas?.map((a) => (
+                  <span key={a.area} className="la-glass px-2 py-0.5 text-[0.85em]" style={{ color: 'var(--danger-text)' }}>
+                    📍 {painAreaLabel(a.area)} {a.level}/10
+                  </span>
+                ))}
                 {e.note && <span style={{ color: 'var(--text-secondary)' }}>“{e.note}”</span>}
               </GlassCard>
             );

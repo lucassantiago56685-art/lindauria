@@ -168,6 +168,36 @@ function SettingsInner() {
                 }}
               />
             </Row>
+            <GlassCard className="flex flex-col gap-3 p-4" style={{ borderColor: s.scanEnabled ? 'var(--accent)' : undefined }}>
+              <div className="font-bold">🔦 Varredura com acionador</div>
+              <p className="text-[0.85em]" style={{ color: 'var(--text-secondary)' }}>
+                Para quando mover a cabeça ficar difícil: o app acende as linhas de botões, uma por vez; a pessoa aciona, ele acende
+                cada botão da linha; aciona de novo e escolhe. O acionador pode ser o gesto de “escolher” (piscada, sobrancelhas ou
+                boca, na aba Gestos), a tecla espaço/Enter (acionadores USB e Bluetooth) ou um sopro/som perto do microfone.
+              </p>
+              <Row label="Varredura">
+                <Toggle value={s.scanEnabled} onChange={set('scanEnabled')} />
+              </Row>
+              {s.scanEnabled && (
+                <>
+                  <Row label="Velocidade (tempo de cada passo)" help="Mais tempo = mais calma para acionar.">
+                    <Stepper value={s.scanMs} min={LIMITS.scanMs[0]} max={LIMITS.scanMs[1]} step={100} format={secs} onChange={set('scanMs')} />
+                  </Row>
+                  <Row label="Acionar por sopro ou som" help="Usa o microfone. Funciona melhor em ambiente silencioso.">
+                    <Toggle value={s.scanSound} onChange={set('scanSound')} />
+                  </Row>
+                  {s.selectGesture === 'none' && !s.scanSound && (
+                    <p className="font-semibold" style={{ color: 'var(--warning-text)' }}>
+                      ⚠️ Escolha um gesto em Gestos → “Gesto para escolher”, ligue o sopro, ou use um acionador de tecla.
+                    </p>
+                  )}
+                </>
+              )}
+            </GlassCard>
+            <p className="text-[0.8em]" style={{ color: 'var(--text-secondary)' }}>
+              👁️ Controle pelo olhar: rastreadores oculares (como Tobii) funcionam como mouse. Escolha “Mouse / toque” e o tempo de
+              parada (dwell) abaixo faz a escolha pelo olhar.
+            </p>
             {tracking.status === 'error' && (
               <p className="font-semibold" style={{ color: 'var(--danger-text)' }}>
                 A câmera não ligou. Verifique a permissão do navegador.
@@ -237,7 +267,7 @@ function SettingsInner() {
                 onChange={set('selectGesture')}
               />
             </Row>
-            <Row label="Duração da piscada longa" help="Piscadas naturais (rápidas) são sempre ignoradas.">
+            <Row label="Duração da piscada longa" help="Piscadas naturais (rápidas) são sempre ignoradas. Olho fechado por muito tempo (cochilo) também não conta. Se houver alarme falso por sono ou olho seco, aumente.">
               <Stepper value={s.longBlinkMs} min={LIMITS.longBlinkMs[0]} max={LIMITS.longBlinkMs[1]} step={100} format={secs} onChange={set('longBlinkMs')} />
             </Row>
             <Row label="Gesto de emergência" help="Funciona em qualquer tela, até no descanso.">
@@ -245,16 +275,26 @@ function SettingsInner() {
                 value={s.emergencyGesture}
                 tone="danger"
                 options={[
-                  { value: 'longBlink3', label: '3 piscadas longas' },
-                  { value: 'browRaise3', label: '3x sobrancelhas' },
+                  { value: 'longBlink3', label: 'Piscadas longas' },
+                  { value: 'browRaise3', label: 'Sobrancelhas' },
                   { value: 'off', label: 'Desligado' },
                 ]}
                 onChange={(v) => (v === 'off' ? setConfirm('emergency-off') : update({ emergencyGesture: v }))}
               />
             </Row>
+            {s.emergencyGesture !== 'off' && (
+              <>
+                <Row label="Quantas vezes para a emergência" help="Mais vezes = menos alarme falso (sono, cansaço, olho seco), porém mais esforço.">
+                  <Stepper value={s.emergencyCount} min={LIMITS.emergencyCount[0]} max={LIMITS.emergencyCount[1]} step={1} format={(v) => `${v} vezes`} onChange={set('emergencyCount')} />
+                </Row>
+                <Row label="Em quanto tempo" help="Os gestos precisam acontecer dentro deste tempo.">
+                  <Stepper value={s.emergencyWindowMs} min={LIMITS.emergencyWindowMs[0]} max={LIMITS.emergencyWindowMs[1]} step={1000} format={secs} onChange={set('emergencyWindowMs')} />
+                </Row>
+              </>
+            )}
             {conflict && (
               <p className="font-semibold" style={{ color: 'var(--warning-text)' }}>
-                ⚠️ O gesto de escolher é o mesmo da emergência: 3 seguidos (em até 8 s) disparam o alarme. Considere usar
+                ⚠️ O gesto de escolher é o mesmo da emergência: {s.emergencyCount} seguidos (em até {s.emergencyWindowMs / 1000} s) disparam o alarme. Considere usar
                 gestos diferentes.
               </p>
             )}
@@ -278,6 +318,9 @@ function SettingsInner() {
             </Row>
             <Row label="Tamanho do texto">
               <Stepper value={s.fontSizePx} min={LIMITS.fontSizePx[0]} max={LIMITS.fontSizePx[1]} step={2} format={(v) => `${v} px`} onChange={set('fontSizePx')} />
+            </Row>
+            <Row label="Botões maiores" help="Para quem enxerga pouco. Combine com o tema de alto contraste (amarelo ou branco).">
+              <Toggle value={s.bigTargets} onChange={set('bigTargets')} />
             </Row>
             <Row label="Modo calmo" help="Sem animações.">
               <Toggle value={s.calmMode} onChange={set('calmMode')} />
@@ -395,8 +438,8 @@ function SettingsInner() {
                 O LindaurIA não substitui médico, equipe de saúde nem monitores de sinais vitais.
               </p>
               <p className="mt-2 text-[0.85em]" style={{ color: 'var(--text-secondary)' }}>
-                Nesta versão (Fase 1), a emergência toca um alarme forte NESTE aparelho. O aviso no WhatsApp/celular da
-                família chega na Fase 3. Em risco de vida: SAMU 192.
+                A emergência toca um alarme forte NESTE aparelho e avisa no celular os familiares autorizados (precisa de
+                internet; sem internet, o aviso fica na fila e sai quando a conexão voltar). Em risco de vida: SAMU 192.
               </p>
             </GlassCard>
             <Row
@@ -408,6 +451,9 @@ function SettingsInner() {
               ) : (
                 <GlowButton tone="primary" icon="✨" label="Criar conta" onClick={() => go('signup')} />
               )}
+            </Row>
+            <Row label="Privacidade e dados" help="Política (LGPD), cópia de segurança, exportar e apagar dados, consentimentos.">
+              <GlowButton tone="primary" icon="🔒" label="Abrir" onClick={() => go('privacy')} />
             </Row>
             <Row label="Armazenamento" help="Tudo fica criptografado neste aparelho.">
               <span className="font-semibold" style={{ color: isPersistentStorage() ? 'var(--success-text)' : 'var(--warning-text)' }}>

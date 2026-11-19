@@ -5,6 +5,7 @@ import { AuthFailure, type Account, type Role } from '@lindauria/shared';
 import { useApp } from '../store/app';
 import { auth, sounds } from '../runtime/engine';
 import { TextField } from '../components/ScrollArea';
+import { PrivacyPolicy } from './Privacy';
 
 /* =============================================================================================
    Entrar / Criar conta — UMA tela, DUAS abas, formulário curto.
@@ -185,7 +186,7 @@ function SignupForm({ onDone }: { onDone: (a: Account) => void }) {
       </div>
       <div className="flex flex-col gap-1">
         <Check checked={consent} onChange={setConsent}>
-          Aceito os termos e a política de privacidade (LGPD)
+          Aceito os termos e a política de privacidade (LGPD), inclusive o uso dos meus dados de saúde para o meu cuidado
         </Check>
         <button type="button" className="self-start pl-10 text-[0.78em] underline" style={{ color: 'var(--primary-text)' }} onClick={() => setTerms((v) => !v)}>
           {terms ? 'Fechar' : 'Ler em palavras simples'}
@@ -199,6 +200,16 @@ function SignupForm({ onDone }: { onDone: (a: Account) => void }) {
             <li>🗑️ Dá para apagar tudo quando quiser.</li>
             <li>🩺 Não substitui médico nem monitores de sinais vitais.</li>
           </ul>
+        )}
+        {terms && (
+          <details className="ml-10 text-[0.85em]">
+            <summary className="cursor-pointer font-semibold underline" style={{ color: 'var(--primary-text)' }}>
+              Política de privacidade completa (LGPD)
+            </summary>
+            <div className="mt-2 flex flex-col gap-2">
+              <PrivacyPolicy />
+            </div>
+          </details>
         )}
       </div>
       {error && <ErrorText>{error}</ErrorText>}

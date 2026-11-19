@@ -31,10 +31,54 @@ export const FEELINGS = [
   { id: 'gratidao', icon: '🙏', label: 'Gratidão' },
 ] as const;
 
+// ---------------------------------------------------------------- mapa de dor
+export const PAIN_AREAS = [
+  { id: 'cabeca', label: 'Cabeça' },
+  { id: 'rosto', label: 'Rosto / boca' },
+  { id: 'pescoco', label: 'Pescoço' },
+  { id: 'ombro-e', label: 'Ombro esquerdo' },
+  { id: 'ombro-d', label: 'Ombro direito' },
+  { id: 'peito', label: 'Peito' },
+  { id: 'barriga', label: 'Barriga' },
+  { id: 'braco-e', label: 'Braço esquerdo' },
+  { id: 'braco-d', label: 'Braço direito' },
+  { id: 'mao-e', label: 'Mão esquerda' },
+  { id: 'mao-d', label: 'Mão direita' },
+  { id: 'costas', label: 'Costas (alto)' },
+  { id: 'lombar', label: 'Lombar' },
+  { id: 'quadril', label: 'Quadril / bumbum' },
+  { id: 'perna-e', label: 'Perna esquerda' },
+  { id: 'perna-d', label: 'Perna direita' },
+  { id: 'joelho-e', label: 'Joelho esquerdo' },
+  { id: 'joelho-d', label: 'Joelho direito' },
+  { id: 'pe-e', label: 'Pé esquerdo' },
+  { id: 'pe-d', label: 'Pé direito' },
+] as const;
+
+export const PAIN_TYPES = [
+  { id: 'pontada', icon: '📍', label: 'Pontada' },
+  { id: 'queimacao', icon: '🔥', label: 'Queimação' },
+  { id: 'caimbra', icon: '🌀', label: 'Cãibra' },
+  { id: 'formigamento', icon: '✨', label: 'Formigamento' },
+  { id: 'peso', icon: '🪨', label: 'Peso / pressão' },
+  { id: 'rigidez', icon: '🧊', label: 'Rigidez' },
+] as const;
+
+export interface PainArea {
+  area: string;
+  level: number; // 0..10
+  types: string[];
+}
+
+export const painAreaLabel = (id: string) => PAIN_AREAS.find((a) => a.id === id)?.label ?? id;
+
 export interface FeelingEntry {
   id: string;
   at: number;
-  mood: number; // 1..5
+  /** 1..5; 0 = não informado (ex.: registro só do mapa de dor) */
+  mood: number;
+  /** mapa de dor: onde dói, quanto e como */
+  painAreas?: PainArea[];
   feelings: string[];
   pain: number | null; // 0..10
   note: string;
@@ -181,6 +225,8 @@ export interface Report {
   feelingCounts: Array<{ id: string; label: string; count: number }>;
   painAvg: number | null;
   painMax: number | null;
+  /** mapa de dor: onde mais doeu no período */
+  painAreas: Array<{ id: string; label: string; count: number; max: number }>;
   entries: FeelingEntry[];
   phrasesTotal: number;
   topPhrases: Array<{ text: string; count: number }>;
@@ -193,9 +239,10 @@ export function buildReport(input: ReportInput, period: Period, now: Date): Repo
   const inRange = (t: number) => t >= from.getTime() && t <= to.getTime();
   const entries = input.feelings.filter((e) => inRange(e.at)).sort((a, b) => a.at - b.at);
 
-  const moodAvg = entries.length ? entries.reduce((a, e) => a + e.mood, 0) / entries.length : null;
+  const withMood = entries.filter((e) => e.mood > 0);
+  const moodAvg = withMood.length ? withMood.reduce((a, e) => a + e.mood, 0) / withMood.length : null;
   const days = new Map<string, number[]>();
-  for (const e of entries) {
+  for (const e of withMood) {
     const k = dayKey(new Date(e.at));
     days.set(k, [...(days.get(k) ?? []), e.mood]);
   }
@@ -208,6 +255,15 @@ export function buildReport(input: ReportInput, period: Period, now: Date): Repo
     .sort((a, b) => b.count - a.count);
 
   const pains = entries.map((e) => e.pain).filter((p): p is number => p !== null);
+  const areaMap = new Map<string, { count: number; max: number }>();
+  for (const e of entries)
+    for (const a of e.painAreas ?? []) {
+      const cur = areaMap.get(a.area) ?? { count: 0, max: 0 };
+      areaMap.set(a.area, { count: cur.count + 1, max: Math.max(cur.max, a.level) });
+    }
+  const painAreas = [...areaMap.entries()]
+    .map(([id, v]) => ({ id, label: painAreaLabel(id), ...v }))
+    .sort((a, b) => b.max - a.max || b.count - a.count);
   const phrases = input.phrases.filter((p) => inRange(p.at));
   const pc = new Map<string, number>();
   for (const p of phrases) pc.set(p.text, (pc.get(p.text) ?? 0) + 1);
@@ -227,6 +283,7 @@ export function buildReport(input: ReportInput, period: Period, now: Date): Repo
     feelingCounts,
     painAvg: pains.length ? pains.reduce((a, b) => a + b, 0) / pains.length : null,
     painMax: pains.length ? Math.max(...pains) : null,
+    painAreas,
     entries,
     phrasesTotal: phrases.length,
     topPhrases,
@@ -251,4 +308,17 @@ export function reminderTargets<T extends { id: string }>(r: Pick<Reminder, 'not
   if (r.notify.includes(NOTIFY_NONE)) return [];
   if (r.notify.length === 0 || r.notify.includes(NOTIFY_ALL)) return members;
   return members.filter((m) => r.notify.includes(m.id));
+}
+
+// ---------------------------------------------------------------- frases de rotina por horário
+export const ROUTINE: Array<{ id: string; label: string; icon: string; from: number; to: number; phrases: string[] }> = [
+  { id: 'manha', label: 'Manhã', icon: '🌅', from: 5, to: 11, phrases: ['Bom dia!', 'Quero escovar os dentes', 'Quero tomar café', 'Quero tomar banho', 'Abre a janela, por favor', 'Dormi bem'] },
+  { id: 'tarde', label: 'Tarde', icon: '☀️', from: 12, to: 17, phrases: ['Quero almoçar', 'Quero descansar um pouco', 'Quero tomar um sol', 'Liga a TV, por favor', 'Quero um lanche', 'Quero beber água'] },
+  { id: 'noite', label: 'Noite', icon: '🌙', from: 18, to: 22, phrases: ['Quero jantar', 'Quero escovar os dentes', 'Quero dormir', 'Apaga a luz, por favor', 'Boa noite', 'Fica comigo um pouco'] },
+  { id: 'madrugada', label: 'Madrugada', icon: '🌌', from: 23, to: 4, phrases: ['Não consigo dormir', 'Quero mudar de posição', 'Estou com dor', 'Estou com sede', 'Preciso de ajuda', 'Pode ficar aqui?'] },
+];
+
+/** período do dia para uma hora (0–23) */
+export function routineFor(hour: number) {
+  return ROUTINE.find((r) => (r.from <= r.to ? hour >= r.from && hour <= r.to : hour >= r.from || hour <= r.to))!;
 }

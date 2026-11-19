@@ -64,6 +64,8 @@ async function post(path: string, body: unknown, timeoutMs = 45_000): Promise<st
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
+  /** quando a resposta foi gerada (para mostrar a data da informação) */
+  at?: number;
 }
 
 export const askChat = (messages: ChatTurn[]) => post('/api/ai/chat', { messages });

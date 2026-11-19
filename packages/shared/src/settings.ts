@@ -62,6 +62,10 @@ export interface Settings {
   selectGesture: SelectGesture;
   longBlinkMs: number;
   emergencyGesture: EmergencyGesture;
+  /** quantos gestos seguidos disparam a emergência (evita alarme falso por sono/olho seco) */
+  emergencyCount: number;
+  /** em quanto tempo os gestos precisam acontecer (ms) */
+  emergencyWindowMs: number;
   calibration: Calibration | null;
   showMeshPreview: boolean;
   /** formato do cursor na tela ('none' = sem seta: só o botão mirado acende) */
@@ -80,6 +84,16 @@ export interface Settings {
   haptics: boolean;
   /** corrige letra trocada ao escrever ("qeuro" → "quero") */
   autoCorrect: boolean;
+  /** banco de voz: quando a frase foi gravada pela pessoa, toca a gravação no lugar da voz do computador */
+  useMyVoice: boolean;
+  /** VARREDURA: o app percorre os botões sozinho; a pessoa escolhe com um acionador */
+  scanEnabled: boolean;
+  /** tempo de cada passo da varredura (ms) */
+  scanMs: number;
+  /** acionador por sopro/som (microfone) */
+  scanSound: boolean;
+  /** botões maiores (baixa visão) */
+  bigTargets: boolean;
   // --- Teclado ---
   keyboard: KeyboardLayoutName;
   shortcuts: Record<string, string>;
@@ -104,6 +118,9 @@ export const LIMITS = {
   sensitivity: [0.3, 3],
   maxSpeedPxS: [150, 3000],
   longBlinkMs: [400, 2000],
+  emergencyCount: [2, 6],
+  scanMs: [600, 5000],
+  emergencyWindowMs: [4000, 20000],
   rearmPx: [10, 200],
   deadZonePx: [0, 20],
   speechRate: [0.5, 1.6],
@@ -123,6 +140,8 @@ export const DEFAULT_SETTINGS: Settings = {
   selectGesture: 'none',
   longBlinkMs: 700,
   emergencyGesture: 'longBlink3',
+  emergencyCount: 3,
+  emergencyWindowMs: 8000,
   calibration: null,
   showMeshPreview: true,
   cursorStyle: 'orb',
@@ -137,6 +156,11 @@ export const DEFAULT_SETTINGS: Settings = {
   sounds: { focus: 0.25, click: 0.5, sent: 0.5, alarm: 1 },
   haptics: true,
   autoCorrect: true,
+  useMyVoice: true,
+  scanEnabled: false,
+  scanMs: 1500,
+  scanSound: false,
+  bigTargets: false,
   keyboard: 'qwerty',
   shortcuts: {
     bd: 'Bom dia, tudo bem com você?',

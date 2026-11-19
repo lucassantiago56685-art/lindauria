@@ -99,3 +99,37 @@ describe('quem recebe o lembrete', () => {
     expect(reminderTargets({ notify: ['nenhum'] }, fam)).toEqual([]);
   });
 });
+
+import { buildReport as build2, routineFor } from './care-logic';
+describe('frases de rotina por horário', () => {
+  it('escolhe o período certo', () => {
+    expect(routineFor(7).id).toBe('manha');
+    expect(routineFor(14).id).toBe('tarde');
+    expect(routineFor(20).id).toBe('noite');
+    expect(routineFor(23).id).toBe('madrugada');
+    expect(routineFor(3).id).toBe('madrugada');
+  });
+});
+describe('mapa de dor no relatório', () => {
+  it('soma as áreas e ignora humor "não informado" na média', () => {
+    const now = new Date(2026, 10, 19, 15, 0);
+    const at = now.getTime() - 3600_000;
+    const r = build2(
+      {
+        feelings: [
+          { id: '1', at, mood: 0, feelings: ['dor'], pain: 7, note: '', painAreas: [{ area: 'lombar', level: 7, types: ['queimacao'] }] },
+          { id: '2', at, mood: 4, feelings: [], pain: null, note: '' },
+          { id: '3', at, mood: 0, feelings: ['dor'], pain: 3, note: '', painAreas: [{ area: 'lombar', level: 3, types: [] }, { area: 'pe-d', level: 3, types: [] }] },
+        ],
+        phrases: [],
+        alerts: [],
+        reminderLogs: [],
+      },
+      'dia',
+      now,
+    );
+    expect(r.moodAvg).toBe(4);
+    expect(r.painAreas[0]).toMatchObject({ id: 'lombar', count: 2, max: 7 });
+    expect(r.painAreas.map((a) => a.id)).toContain('pe-d');
+  });
+});
