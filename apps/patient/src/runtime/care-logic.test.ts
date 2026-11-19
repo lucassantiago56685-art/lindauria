@@ -86,3 +86,16 @@ describe('Relatório', () => {
     expect(r.painMax).toBe(6);
   });
 });
+
+import { reminderTargets } from './care-logic';
+describe('quem recebe o lembrete', () => {
+  const fam = [{ id: 'a' }, { id: 'b' }];
+  it('todos (inclusive cadastrados depois) quando "*" ou vazio', () => {
+    expect(reminderTargets({ notify: ['*'] }, fam)).toHaveLength(2);
+    expect(reminderTargets({ notify: [] }, fam)).toHaveLength(2);
+  });
+  it('só os escolhidos, ou ninguém', () => {
+    expect(reminderTargets({ notify: ['b'] }, fam)).toEqual([{ id: 'b' }]);
+    expect(reminderTargets({ notify: ['nenhum'] }, fam)).toEqual([]);
+  });
+});

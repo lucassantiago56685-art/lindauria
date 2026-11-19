@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { GlassCard, GlowButton } from '@lindauria/design-system';
 import { useCare } from '../runtime/care';
-import { REMINDER_KINDS, isValidTime, nextOccurrence, type Reminder, type ReminderKind } from '../runtime/care-logic';
+import { NOTIFY_ALL, NOTIFY_NONE, REMINDER_KINDS, isValidTime, nextOccurrence, reminderTargets, type Reminder, type ReminderKind } from '../runtime/care-logic';
 import { canReceiveAlerts, useFamily } from '../runtime/family';
 import { sounds } from '../runtime/engine';
 import { ConfirmDialog, ScreenShell } from '../components/common';
@@ -20,14 +20,17 @@ function ReminderForm({ reminder, onClose }: { reminder?: Reminder; onClose: () 
   const [newTime, setNewTime] = useState('12:00');
   const [days, setDays] = useState<number[]>(reminder?.days ?? []);
   const [note, setNote] = useState(reminder?.note ?? '');
-  const [notify, setNotify] = useState<string[]>(reminder?.notify ?? members.map((m) => m.id));
+  const startAll = !reminder || reminder.notify.length === 0 || reminder.notify.includes(NOTIFY_ALL);
+  const [everyone, setEveryone] = useState(startAll);
+  const [notify, setNotify] = useState<string[]>(startAll ? members.map((m) => m.id) : (reminder?.notify ?? []).filter((x) => x !== NOTIFY_NONE));
   const [error, setError] = useState<string | null>(null);
 
   function save() {
     const t = title.trim() || REMINDER_KINDS.find((k) => k.id === kind)!.label;
     const valid = [...new Set(times.filter(isValidTime))].sort();
     if (!valid.length) return setError('Adicione pelo menos um horário.');
-    saveReminder({ id: reminder?.id, kind, title: t, times: valid, days, note: note.trim(), notify, active: reminder?.active ?? true });
+    const who = everyone ? [NOTIFY_ALL] : notify.length ? notify : [NOTIFY_NONE];
+    saveReminder({ id: reminder?.id, kind, title: t, times: valid, days, note: note.trim(), notify: who, active: reminder?.active ?? true });
     sounds.sent();
     onClose();
   }
@@ -97,7 +100,8 @@ function ReminderForm({ reminder, onClose }: { reminder?: Reminder; onClose: () 
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {members.map((m) => (
+                <GlowButton tone="success" aria-pressed={everyone} icon="👨‍👩‍👧" label="Todos da família" hint="inclusive quem for cadastrado depois" className="col-span-2 text-[0.85em]" onClick={() => setEveryone((v) => !v)} />
+                {!everyone && members.map((m) => (
                   <GlowButton key={m.id} tone="accent" aria-pressed={notify.includes(m.id)} icon="📲" label={m.name} hint={m.relation} className="text-[0.8em]" onClick={() => setNotify(notify.includes(m.id) ? notify.filter((x) => x !== m.id) : [...notify, m.id])} />
                 ))}
               </div>
@@ -137,7 +141,7 @@ export function Reminders() {
   return (
     <ScreenShell icon="⏰" title="Lembretes" subtitle="remédios, comida, água, posição…">
       <GlassCard className="shrink-0 p-3 text-[0.82em]" style={{ color: 'var(--text-secondary)' }}>
-        No horário, o app toca, fala em voz alta e avisa no celular o familiar escolhido. Funciona com o LindaurIA aberto neste
+        No horário, o app toca, fala em voz alta e avisa no celular da família. Funciona com o LindaurIA aberto neste
         aparelho. Os horários e doses são definidos pela família e pela equipe de saúde.
       </GlassCard>
       <ScrollArea innerClassName="flex flex-col gap-3 pb-3">
@@ -145,7 +149,7 @@ export function Reminders() {
         {sorted.map((r) => {
           const k = REMINDER_KINDS.find((x) => x.id === r.kind)!;
           const next = nextOccurrence(r, now);
-          const who = family.filter((m) => r.notify.includes(m.id)).map((m) => m.name);
+          const who = reminderTargets(r, family.filter(canReceiveAlerts)).map((m) => m.name);
           return (
             <GlassCard key={r.id} className="flex flex-col gap-3 p-4" style={{ opacity: r.active ? 1 : 0.75 }}>
               <div className="flex flex-wrap items-center gap-2">

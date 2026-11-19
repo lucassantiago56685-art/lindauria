@@ -168,7 +168,17 @@ export function FamilyWatch() {
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   useEffect(() => {
-    void startWatching();
+    void (async () => {
+      await startWatching();
+      // veio pelo link do convite: já conecta, sem precisar digitar nada
+      const q = new URLSearchParams(location.search);
+      const fromLink = q.get('familia');
+      if (fromLink && (await add(fromLink, q.get('nome') ?? ''))) {
+        setCode('');
+        history.replaceState(null, '', location.pathname);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function submit(e?: FormEvent) {
@@ -210,6 +220,9 @@ export function FamilyWatch() {
       </div>
 
       <ScrollArea innerClassName="flex flex-col gap-3 pb-4">
+        {/* pronto para receber alarmes? (primeiro da tela: é o que falta fazer) */}
+        {patients.length > 0 && <ReadyCard perm={perm} onEnable={async () => setPerm((await enableEverything()).perm)} />}
+
         {/* cadastrar código */}
         <GlassCard className="flex flex-col gap-3 p-4">
           <h2 className="font-bold">🔑 {patients.length ? 'Adicionar outro paciente' : 'Digite o código de acesso'}</h2>
@@ -219,7 +232,7 @@ export function FamilyWatch() {
               icon="🔑"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="abcde-fghij-klmno"
+              placeholder="Ex.: abcde-fghij-klmno"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
@@ -235,8 +248,6 @@ export function FamilyWatch() {
           </form>
         </GlassCard>
 
-        {/* pronto para receber alarmes? */}
-        {patients.length > 0 && <ReadyCard perm={perm} onEnable={async () => setPerm((await enableEverything()).perm)} />}
 
         {/* pacientes acompanhados */}
         {patients.map((p) => (

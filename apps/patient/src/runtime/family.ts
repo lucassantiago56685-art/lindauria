@@ -338,22 +338,36 @@ export function sendTest(m: FamilyMember) {
 /** código de acesso legível: "abcde-fghij-klmno" */
 export const accessCode = (m: FamilyMember) => m.topic.replace('lindauria-', '').replace(/(.{5})(?=.)/g, '$1-');
 
-/** link que abre o LindaurIA direto no modo familiar, com o código preenchido */
-export const inviteLink = (m: FamilyMember) => `${location.origin}${import.meta.env.BASE_URL}?familia=${encodeURIComponent(accessCode(m))}`;
+/**
+ * Endereço PÚBLICO do app (com certificado de verdade). O convite sempre aponta para ele, mesmo
+ * que o paciente esteja usando o app pelo computador de casa (192.168..., que o celular de fora não abre).
+ */
+export const PUBLIC_APP_URL: string = import.meta.env.VITE_PUBLIC_URL || 'https://lucassantiago56685-art.github.io/lindauria/';
+const isPrivateHost = (h: string) => h === 'localhost' || /^(127.|10.|192.168.|172.(1[6-9]|2d|3[01]).)/.test(h);
+export const appUrl = () => (typeof location !== 'undefined' && !isPrivateHost(location.hostname) ? `${location.origin}${import.meta.env.BASE_URL}` : PUBLIC_APP_URL);
+
+/** link que abre o LindaurIA direto no modo familiar e JÁ conecta (só falta ativar o som) */
+export const inviteLink = (m: FamilyMember) => {
+  const nome = patientDisplayName();
+  return `${appUrl()}?familia=${encodeURIComponent(accessCode(m))}${nome && !/paciente/i.test(nome) ? `&nome=${encodeURIComponent(nome)}` : ''}`;
+};
 
 /** texto do convite (WhatsApp etc.) */
 export function inviteText(m: FamilyMember) {
   const server = getSettings().alertServer.replace(/\/+$/, '');
   const custom = server !== 'https://ntfy.sh';
   return [
-    `Olá, ${m.name}! Você foi autorizado(a) a receber os alertas de emergência de ${patientDisplayName()} pelo LindaurIA.`,
+    `Olá, ${m.name}! Você vai receber no celular os alertas de ${patientDisplayName()} (emergência e lembretes de remédio/comida) pelo LindaurIA.`,
     '',
-    `🔑 Seu código de acesso: ${accessCode(m)}`,
+    'PASSO 1 — toque neste link:',
+    `   ${inviteLink(m)}`,
+    'PASSO 2 — toque no botão amarelo "Ativar tudo" e aceite as notificações.',
+    'PRONTO! Deixe a página aberta (pode bloquear a tela).',
     '',
-    'Opção A — no próprio LindaurIA:',
-    `   abra ${inviteLink(m)} (ou toque em "Sou familiar" e digite o código).`,
+    `Se pedir um código, digite: ${accessCode(m)}`,
+    `(ou abra ${appUrl()} → "Sou familiar" → digite o código)`,
     '',
-    'Opção B — para receber até com o celular bloqueado, instale o app "ntfy" (grátis):',
+    'EXTRA (recomendado) — para tocar até com o celular bloqueado ou o navegador fechado, instale o app "ntfy" (grátis):',
     '   Android: https://play.google.com/store/apps/details?id=io.heckel.ntfy',
     '   iPhone: https://apps.apple.com/app/ntfy/id1625396347',
     `   No ntfy, toque em "+" e digite: ${m.topic}`,

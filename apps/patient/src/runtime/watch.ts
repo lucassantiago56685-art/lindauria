@@ -197,7 +197,14 @@ function onMessage(code: string, raw: string) {
   } else if (item.kind === 'photo') {
     void showSystemNotification(item.title, item.message, item.photoUrl);
   } else if (item.kind === 'reminder') {
-    vibrate([300, 150, 300]);
+    // lembrete (remédio, comida...): toca 4 segundos e vibra — sem insistir como a emergência
+    if (!useWatch.getState().alarmSounding) {
+      siren.start(0.7);
+      setTimeout(() => {
+        if (!useWatch.getState().alarmSounding) siren.stop();
+      }, 4000);
+    }
+    vibrate([300, 150, 300, 150, 300]);
     void showSystemNotification(item.title, item.message);
   } else if (item.kind === 'reply') {
     // alguém da família já está indo: avisa os outros (sem parar o alarme deles)

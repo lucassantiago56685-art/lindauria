@@ -62,7 +62,11 @@ export interface Reminder {
   /** dias da semana (0 = domingo). Vazio = todos os dias. */
   days: number[];
   note: string;
-  /** familiares (ids) que recebem a notificação no celular */
+  /**
+   * quem recebe a notificação no celular:
+   *  ['*'] ou [] = TODOS os familiares autorizados (inclusive os cadastrados depois)
+   *  ['nenhum'] = ninguém; senão, os ids escolhidos
+   */
   notify: string[];
   active: boolean;
   createdAt: number;
@@ -239,3 +243,12 @@ export function buildReport(input: ReportInput, period: Period, now: Date): Repo
 
 export const moodLabel = (v: number | null) =>
   v === null ? 'sem registro' : MOODS.reduce((best, m) => (Math.abs(m.value - v) < Math.abs(best.value - v) ? m : best)).label;
+
+export const NOTIFY_ALL = '*';
+export const NOTIFY_NONE = 'nenhum';
+/** quem deve ser avisado de um lembrete (lista vazia = todos, para lembretes criados antes da família) */
+export function reminderTargets<T extends { id: string }>(r: Pick<Reminder, 'notify'>, members: T[]): T[] {
+  if (r.notify.includes(NOTIFY_NONE)) return [];
+  if (r.notify.length === 0 || r.notify.includes(NOTIFY_ALL)) return members;
+  return members.filter((m) => r.notify.includes(m.id));
+}

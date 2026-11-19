@@ -9,8 +9,7 @@ import {
   type DueReminder,
   type FeelingEntry,
   type Reminder,
-  type ReminderLog,
-} from './care-logic';
+  type ReminderLog, reminderTargets } from './care-logic';
 import { canReceiveAlerts, patientDisplayName, useFamily } from './family';
 
 /* =============================================================================================
@@ -88,7 +87,7 @@ const kindOf = (k: Reminder['kind']) => REMINDER_KINDS.find((x) => x.id === k)!;
 
 /** avisa no celular os familiares escolhidos para este lembrete (só os autorizados pelo paciente) */
 function notifyFamily(r: Reminder, title: string, message: string, tags: string[], priority: 2 | 3 | 4) {
-  const members = useFamily.getState().list.filter((m) => canReceiveAlerts(m) && r.notify.includes(m.id));
+  const members = reminderTargets(r, useFamily.getState().list.filter(canReceiveAlerts));
   const n = new NtfyNotifier(getSettings().alertServer);
   for (const m of members) void n.sendText(m.topic, { title, message, priority, tags }).catch(() => undefined);
 }
