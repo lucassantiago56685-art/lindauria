@@ -94,6 +94,8 @@ export interface Settings {
   scanSound: boolean;
   /** botões maiores (baixa visão) */
   bigTargets: boolean;
+  /** modo Mouse/toque: mostrar a bolinha e clicar parando em cima (para rastreador ocular). Desligado = mouse/toque normal */
+  pointerDwell: boolean;
   // --- Teclado ---
   keyboard: KeyboardLayoutName;
   shortcuts: Record<string, string>;
@@ -161,6 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
   scanMs: 1500,
   scanSound: false,
   bigTargets: false,
+  pointerDwell: false,
   keyboard: 'qwerty',
   shortcuts: {
     bd: 'Bom dia, tudo bem com você?',

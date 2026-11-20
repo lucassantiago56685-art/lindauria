@@ -70,7 +70,8 @@ export function App() {
   const resting = useApp((s) => s.resting);
   const emergency = useApp((s) => s.emergency);
   const calm = useSettings((s) => s.settings.calmMode);
-  const cursorStyle = useSettings((s) => s.settings.cursorStyle);
+  // no modo Mouse/toque a bolinha só aparece se o cuidador ligou o clique automático (rastreador ocular)
+  const cursorStyle = useSettings((s) => (s.settings.inputMode === 'pointer' && !s.settings.pointerDwell ? 'none' : s.settings.cursorStyle));
   const Current = SCREENS[screen];
 
   return (

@@ -194,10 +194,12 @@ function SettingsInner() {
                 </>
               )}
             </GlassCard>
-            <p className="text-[0.8em]" style={{ color: 'var(--text-secondary)' }}>
-              👁️ Controle pelo olhar: rastreadores oculares (como Tobii) funcionam como mouse. Escolha “Mouse / toque” e o tempo de
-              parada (dwell) abaixo faz a escolha pelo olhar.
-            </p>
+            <Row
+              label="Mouse / toque: bolinha e clique automático"
+              help="Desligado (normal): no modo Mouse / toque, sem bolinha; clique ou toque normalmente. Ligue só para rastreador ocular (ex.: Tobii): a bolinha aparece e escolhe quando você para o olhar em cima."
+            >
+              <Toggle value={s.pointerDwell} onChange={set('pointerDwell')} />
+            </Row>
             {tracking.status === 'error' && (
               <p className="font-semibold" style={{ color: 'var(--danger-text)' }}>
                 A câmera não ligou. Verifique a permissão do navegador.

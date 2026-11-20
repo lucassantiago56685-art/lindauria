@@ -221,7 +221,8 @@ export async function startInput(mode: InputMode): Promise<TrackerError | null> 
   }
   const p = active;
   // com a varredura ligada, a seta não clica sozinha (quem escolhe é o acionador)
-  unsubs.push(p.onPointer((s) => !getSettings().scanEnabled && dwell.feed(s)));
+  // Mouse/toque: clique normal, sem clique automático — a não ser que o cuidador ligue (rastreador ocular)
+  unsubs.push(p.onPointer((s) => !getSettings().scanEnabled && (mode === 'head' || getSettings().pointerDwell) && dwell.feed(s)));
   unsubs.push(p.onGesture(onGesture));
   unsubs.push(
     p.onStatus((st) => useApp.setState((a) => ({ tracking: { ...a.tracking, detected: st.detected, fps: st.fps } }))),
@@ -304,6 +305,7 @@ function applySettings(s: Settings) {
   setAutoCorrect(s.autoCorrect !== false);
   applyScan(s);
   document.documentElement.toggleAttribute('data-big-targets', !!s.bigTargets);
+  if (s.inputMode === 'pointer' && !s.pointerDwell) dwell.disarm(); // sem clique automático pendente
   emergencySeq.count = s.emergencyCount;
   emergencySeq.windowMs = s.emergencyWindowMs;
   sounds.volumes = s.sounds;
