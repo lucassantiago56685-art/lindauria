@@ -30,13 +30,44 @@ interface TgState {
   loaded: boolean;
   /** problema atual (token revogado, outro aparelho usando o robô...) */
   problem: string | null;
+  /** resultado do link de configuração (#telegram=...) para mostrar na tela */
+  setupResult: { ok: boolean; text: string } | null;
 }
 
 export const useTelegram = create<TgState>(() => ({
   bot: null,
   loaded: false,
   problem: null,
+  setupResult: null,
 }));
+
+/**
+ * LINK DE CONFIGURAÇÃO: abrir o LindaurIA com "#telegram=<token>" conecta o robô sozinho.
+ * O token vai depois do "#", que o navegador NÃO envia para o site; e é apagado da barra de
+ * endereço na hora.
+ */
+export async function setupFromLink() {
+  if (typeof location === "undefined") return;
+  const m = location.hash.match(/[#&]telegram=([^&]+)/);
+  if (!m) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  try {
+    const bot = await connectBot(decodeURIComponent(m[1]));
+    useTelegram.setState({
+      setupResult: {
+        ok: true,
+        text: `Telegram conectado! Robô @${bot.username}. Agora, em Família, envie o convite para cada familiar.`,
+      },
+    });
+  } catch (e) {
+    useTelegram.setState({
+      setupResult: {
+        ok: false,
+        text: `Não consegui conectar o Telegram: ${e instanceof Error ? e.message : "erro"}. Confira a internet e abra o link de novo.`,
+      },
+    });
+  }
+}
 
 export class TelegramError extends Error {
   constructor(
