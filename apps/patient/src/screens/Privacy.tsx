@@ -42,7 +42,7 @@ export function PrivacyPolicy() {
       <Block icon="📤" title="Quando algo sai do aparelho">
         <p>
           <strong>Alertas para a família</strong> (emergência, lembretes e, se autorizado, fotos da emergência): passam pelo
-          serviço ntfy.sh até o celular dos familiares que <em>o paciente</em> autorizou. O endereço é secreto, mas não use
+          serviço ntfy.sh e, se o cuidador conectar um robô, pelo Telegram, até o celular dos familiares que <em>o paciente</em> autorizou. O endereço é secreto, mas não use
           esse canal para outras informações.
         </p>
         <p>

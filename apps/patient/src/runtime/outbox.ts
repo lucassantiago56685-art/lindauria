@@ -17,7 +17,15 @@ export interface OutboxItem {
   createdAt: number;
   /** para a tela de emergência mostrar quem está esperando */
   memberId?: string;
+  /** conversa do Telegram do familiar (se ele conectou) */
+  chatId?: number;
   kind: 'emergency' | 'reminder' | 'other';
+}
+
+/** quem envia (family.ts troca para mandar pelo Telegram + ntfy) */
+let sender: (item: OutboxItem & { msg: AlertMessage }) => Promise<unknown> = (item) => new NtfyNotifier(getSettings().alertServer).sendText(item.topic, item.msg);
+export function setOutboxSender(fn: typeof sender) {
+  sender = fn;
 }
 
 interface OutboxState {
@@ -53,7 +61,6 @@ export async function flushOutbox() {
   if (flushing) return;
   flushing = true;
   try {
-    const n = new NtfyNotifier(getSettings().alertServer);
     for (const item of [...useOutbox.getState().items]) {
       if (Date.now() - item.createdAt > MAX_AGE_MS) {
         drop(item.id);
@@ -64,7 +71,7 @@ export async function flushOutbox() {
         ? { ...item.msg, message: `${item.msg.message}\n⚠ Enviado com atraso: o aparelho estava sem internet desde ${hhmm(item.createdAt)}.` }
         : item.msg;
       try {
-        await n.sendText(item.topic, msg);
+        await sender({ ...item, msg });
         drop(item.id);
         onDelivered(item);
       } catch {

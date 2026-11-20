@@ -29,6 +29,7 @@ import {
 import { Speaker } from '@lindauria/voice';
 import { useApp } from '../store/app';
 import { startOutbox } from './outbox';
+import { loadTelegram, startTelegramPolling } from './telegram';
 import { playFromBank } from './voicebank';
 import { Scanner, SoundSwitch } from './scanner';
 
@@ -318,6 +319,9 @@ export async function initRuntime() {
   });
   predictor.importUserModel(await secureGet<UserModel>('vocab'));
   await useFamily.getState().load();
+  // Telegram: se o cuidador conectou um robô, escuta o "Iniciar" e o "Estou indo" da família
+  await loadTelegram();
+  startTelegramPolling();
   await useCare.getState().load();
   // lembretes: toca um sininho 3x, vibra e fala o lembrete
   setReminderRingHandler((d) => {

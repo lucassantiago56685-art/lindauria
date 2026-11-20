@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 import { secureGet, secureSet } from '@lindauria/shared';
-import { NtfyNotifier } from '@lindauria/safety';
-import { getSettings } from '../store/settings';
 import {
   REMINDER_KINDS,
   dueReminders,
@@ -10,7 +8,7 @@ import {
   type FeelingEntry,
   type Reminder,
   type ReminderLog, reminderTargets } from './care-logic';
-import { canReceiveAlerts, patientDisplayName, useFamily } from './family';
+import { canReceiveAlerts, deliver, patientDisplayName, useFamily } from './family';
 import { enqueue } from './outbox';
 
 /* =============================================================================================
@@ -89,11 +87,10 @@ const kindOf = (k: Reminder['kind']) => REMINDER_KINDS.find((x) => x.id === k)!;
 /** avisa no celular os familiares escolhidos para este lembrete (só os autorizados pelo paciente) */
 function notifyFamily(r: Reminder, title: string, message: string, tags: string[], priority: 2 | 3 | 4) {
   const members = reminderTargets(r, useFamily.getState().list.filter(canReceiveAlerts));
-  const n = new NtfyNotifier(getSettings().alertServer);
   for (const m of members) {
     const msg = { title, message, priority, tags };
-    // sem internet: guarda na fila e envia quando a conexão voltar
-    void n.sendText(m.topic, msg).catch(() => enqueue({ topic: m.topic, msg, memberId: m.id, kind: 'reminder' }));
+    // Telegram (se o familiar conectou) + ntfy; sem internet: guarda na fila e envia quando a conexão voltar
+    void deliver(m, msg).catch(() => enqueue({ topic: m.topic, chatId: m.telegramChatId, msg, memberId: m.id, kind: 'reminder' }));
   }
 }
 

@@ -66,6 +66,9 @@ export async function exportProtectedBackup(password: string): Promise<number> {
 
 export async function exportReadable(): Promise<void> {
   const data = await collect();
+  // o arquivo legível não leva a "senha" do robô do Telegram
+  const bot = data['telegram-bot'] as { token?: string } | null | undefined;
+  if (bot?.token) data['telegram-bot'] = { ...bot, token: '(oculto por segurança)' };
   download(
     `lindauria-meus-dados-${stamp()}.json`,
     JSON.stringify({ aviso: 'Seus dados do LindaurIA (LGPD, art. 18). Contém dados de saúde: guarde com cuidado.', exportadoEm: new Date().toISOString(), dados: data }, null, 2),
