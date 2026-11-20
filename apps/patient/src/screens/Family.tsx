@@ -537,7 +537,7 @@ export function Family() {
 
       <ScrollArea innerClassName="flex flex-col gap-3 pb-4">
         <TelegramSetup />
-        {authorizedCount > 0 && <TestAlarmButton />}
+        {list.length > 0 && <TestAlarmButton />}
         <GlowButton
           tone="primary"
           icon="➕"
@@ -923,18 +923,21 @@ function TestAlarmButton() {
           setState("Enviando…");
           const r = await sendTestAlarm();
           setState(
-            r.failed
-              ? `⚠ ${r.failed} não receberam (sem internet?)`
-              : `✔ Enviado para ${r.sent}. Peça para conferirem se tocou alto.`,
+            [
+              r.failed
+                ? `⚠ ${r.failed} não receberam:`
+                : `✔ Enviado para ${r.sent}. Peça para conferirem se tocou alto.`,
+              ...r.report,
+            ].join("\n"),
           );
         }}
       />
       {state && (
         <p
           role="status"
-          className="px-1 text-[0.85em] font-semibold"
+          className="whitespace-pre-line px-1 text-[0.85em] font-semibold"
           style={{
-            color: state.startsWith("⚠")
+            color: /[⚠✘⏳]/.test(state)
               ? "var(--warning-text)"
               : "var(--success-text)",
           }}

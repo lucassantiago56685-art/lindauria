@@ -539,10 +539,20 @@ async function escalate(e: EmergencyEvent, first: AlertMessage) {
 export async function sendTestAlarm(): Promise<{
   sent: number;
   failed: number;
+  /** uma linha por familiar, dizendo POR ONDE foi ou POR QUE não foi */
+  report: string[];
 }> {
-  const members = useFamily.getState().list.filter(canReceiveAlerts);
+  const all = useFamily.getState().list;
+  const members = all.filter(canReceiveAlerts);
   const name = patientDisplayName();
+  const hasBot = !!useTelegram.getState().bot;
   let failed = 0;
+  const report: string[] = all
+    .filter((m) => !canReceiveAlerts(m))
+    .map(
+      (m) =>
+        `⏳ ${m.name}: falta o paciente autorizar — não recebe nada ainda.`,
+    );
   await Promise.all(
     members.map((m) =>
       deliver(m, {
@@ -551,12 +561,37 @@ export async function sendTestAlarm(): Promise<{
           'Isto é só um teste. Se o celular tocou alto, está tudo certo! Toque em "Estou indo" para parar.',
         priority: 5,
         tags: ["rotating_light", "test-alarm"],
-      }).catch(() => {
-        failed++;
-      }),
+      })
+        .then(() =>
+          report.push(
+            m.telegramChatId && hasBot
+              ? `✔ ${m.name}: entregue no Telegram.`
+              : hasBot
+                ? `⚠ ${m.name}: NÃO está no Telegram (não tocou em INICIAR no link do convite). Foi só pelo site/ntfy.`
+                : `✔ ${m.name}: enviado pelo ntfy (Telegram não configurado).`,
+          ),
+        )
+        .catch((e: unknown) => {
+          failed++;
+          report.push(`✘ ${m.name}: ${explainTelegramError(e)}`);
+        }),
     ),
   );
-  return { sent: members.length - failed, failed };
+  return { sent: members.length - failed, failed, report };
+}
+
+/** traduz o erro do Telegram para algo que a família entende */
+function explainTelegramError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/blocked by the user/i.test(msg))
+    return 'bloqueou o robô no Telegram. Peça para abrir o robô e tocar em "Desbloquear"/"Reiniciar".';
+  if (/chat not found|user is deactivated/i.test(msg))
+    return "o Telegram não achou a conversa. Envie o convite de novo e peça para tocar em INICIAR.";
+  if (/Unauthorized/i.test(msg))
+    return "o token do robô não vale mais. Configure o Telegram de novo.";
+  if (/Failed to fetch|NetworkError|Load failed/i.test(msg))
+    return "sem internet neste aparelho.";
+  return `erro do Telegram: ${msg}`;
 }
 
 export function notifyKindChange(e: EmergencyEvent) {
