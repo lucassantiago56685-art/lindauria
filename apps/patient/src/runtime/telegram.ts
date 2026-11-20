@@ -104,16 +104,19 @@ async function call<T>(
   params: Record<string, string | Blob> = {},
   signal?: AbortSignal,
 ): Promise<T> {
-  const fd = new FormData();
-  for (const [k, v] of Object.entries(params)) {
-    if (v instanceof Blob) fd.append(k, v, "foto.jpg");
-    else fd.append(k, v);
+  const url = `${API}/bot${token}/${method}`;
+  let res: Response;
+  if (!Object.keys(params).length) {
+    // o Telegram recusa (400) um formulário VAZIO: sem parâmetros, usa GET
+    res = await fetch(url, { signal });
+  } else {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(params)) {
+      if (v instanceof Blob) fd.append(k, v, "foto.jpg");
+      else fd.append(k, v);
+    }
+    res = await fetch(url, { method: "POST", body: fd, signal });
   }
-  const res = await fetch(`${API}/bot${token}/${method}`, {
-    method: "POST",
-    body: fd,
-    signal,
-  });
   const data = (await res.json().catch(() => null)) as {
     ok: boolean;
     result?: T;
@@ -154,6 +157,8 @@ export async function connectBot(rawToken: string): Promise<TelegramBot> {
         "O Telegram não aceitou esse token. Copie de novo a mensagem do @BotFather.",
         e.code,
       );
+    if (e instanceof TelegramError)
+      throw new TelegramError(`O Telegram respondeu: ${e.message}`, e.code);
     throw new TelegramError(
       "Sem conexão com o Telegram. Verifique a internet.",
       0,
